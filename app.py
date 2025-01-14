@@ -207,8 +207,8 @@ def top_ips_chart(table):
         colors = plt.cm.Reds([0.8 - 0.2 * i for i in range(len(ips))])
 
         bars = ax.bar(ips, request_counts, color=colors, edgecolor='black', width=0.35)
-        ax.set_xlabel('Adres IP', fontsize=12)
-        ax.set_ylabel('Liczba zapytań', fontsize=12)
+        ax.set_xlabel('Adres IP', fontsize=11, fontweight='bold')
+        ax.set_ylabel('Liczba zapytań', fontsize=11, fontweight='bold')
         ax.grid(axis='y', linestyle='--', alpha=0.7)
 
         for bar in bars:

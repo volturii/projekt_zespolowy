@@ -11,7 +11,7 @@ import matplotlib
 matplotlib.use('Agg')  # Wymusza użycie backendu bez GUI
 import matplotlib.pyplot as plt
 import io
-
+from collections import Counter
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -21,9 +21,7 @@ app = Flask(__name__)
 
 # Functions for database connection
 def polaczZBaza():
-    return sqlite3.connect('logs_database.db')
-
-
+    return sqlite3.connect('logs_database_test.db')
 
 
 
@@ -109,6 +107,92 @@ def get_http_status_codes(table):
     except sqlite3.Error as e:
         print(f"Błąd bazy danych: {e}")
         return {}
+    
+
+
+
+
+
+
+
+# Funkcja do wydobywania systemu operacyjnego z user_agent
+def get_operating_system(user_agent):
+    # Wzorce do wykrywania systemów operacyjnych
+    os_patterns = {
+        'Windows': r'Windows NT \d+\.\d+',
+        'Mac OS': r'Macintosh;.*Mac OS X',
+        'Ubuntu': r'X11;.*Ubuntu',
+        'iOS': r'iPhone.*CPU iPhone OS',
+        'Android': r'Android \d+\.\d+',
+        'Linux': r'Linux',
+    }
+
+    # Dodanie obsługi dla narzędzi jak curl i wget
+    if 'curl' in user_agent or 'Wget' in user_agent:
+        return 'Bot'
+
+    for os_name, pattern in os_patterns.items():
+        if re.search(pattern, user_agent):
+            return os_name
+    return 'Inny'
+
+
+# Funkcja do pobierania systemów operacyjnych z bazy
+def get_os_data(table):
+    query = f"""
+        SELECT user_agent
+        FROM {table}
+        WHERE user_agent IS NOT NULL;
+    """
+    try:
+        conn = polaczZBaza()
+        cursor = conn.cursor()
+        cursor.execute(query)
+        results = cursor.fetchall()
+        conn.close()
+
+        # Analizowanie user_agent i zliczanie systemów operacyjnych
+        os_list = [get_operating_system(row[0]) for row in results]
+        os_count = dict(Counter(os_list))  # Zliczanie wystąpień systemów operacyjnych
+        return os_count
+    except sqlite3.Error as e:
+        print(f"Błąd bazy danych: {e}")
+        return {}
+
+# Endpoint do generowania wykresu systemów operacyjnych
+@app.route('/os_chart/<table>')
+def os_chart(table):
+    data = get_os_data(table)
+    fig, ax = plt.subplots(figsize=(7.5, 4))
+
+    if data:
+        os_names = list(data.keys())
+        counts = list(data.values())
+
+        # Tworzenie wykresu słupkowego poziomego
+        bars = ax.barh(os_names, counts, color='skyblue', edgecolor='black', height=0.45)
+        ax.set_xlabel('Liczba zapytań', fontsize=11, fontweight='bold')
+        ax.set_ylabel('System Operacyjny', fontsize=11, fontweight='bold')
+        ax.grid(axis='x', linestyle='--', alpha=0.7)
+
+        for bar in bars:
+            width = bar.get_width()
+            ax.text(width + 0.5, bar.get_y() + bar.get_height() / 2, f'{width}', ha='left', va='center', fontsize=10)
+    else:
+        ax.text(0.5, 0.5, 'Brak danych', ha='center', va='center', fontsize=12)
+        ax.axis('off')
+
+    img = io.BytesIO()
+    plt.savefig(img, format='png', bbox_inches='tight')
+    img.seek(0)
+    plt.close(fig)
+    return Response(img, mimetype='image/png')
+
+
+
+
+
+    
 
 # Endpoint do generowania wykresu słupkowego (Ranking IP)
 @app.route('/top_ips_chart/<table>')

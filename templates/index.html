@@ -2,14 +2,7 @@
 {% block bodyContent %}
 <div class="container-fluid" style="padding-top: 110px;">
   <!-- Formularz do przełączania tabeli -->
-  <div class="row mb-4">
-    <div class="col-12 text-center">
-      <form method="get" action="" id="switchTableForm">
-        <button type="submit" class="btn btn-primary" name="table" value="nginx_logs">nginx_logs</button>
-        <button type="submit" class="btn btn-primary" name="table" value="apache_access_logs">apache_access_logs</button>
-      </form>
-    </div>
-  </div>
+
 
   <!-- Pierwszy wiersz -->
   <div class="row">
@@ -20,7 +13,7 @@
           Ranking użytkowników
         </div>
         <div class="card-body d-flex justify-content-center align-items-center" style="overflow: hidden;">
-          <img src="{{ url_for('top_ips_chart', table=request.args.get('table', 'nginx_logs')) }}" alt="Wykres top 4 IP" class="img-fluid" style="max-width: 100%;">
+         <img src="{{ url_for('top_ips_chart', table=table) }}" alt="Ranking IP">
         </div>
       </div>
     </div>
@@ -32,7 +25,7 @@
           Procentowy udział metod HTTP
         </div>
         <div class="card-body d-flex justify-content-center align-items-center" style="overflow: hidden;">
-          <img src="{{ url_for('http_methods_chart', table=request.args.get('table', 'nginx_logs')) }}" alt="Wykres kołowy metod HTTP" class="img-fluid" style="max-width: 100%;">
+          <img src="{{ url_for('http_methods_chart', table=table) }}" alt="Wykres kołowy metod HTTP" class="img-fluid" style="max-width: 100%;">
         </div>
       </div>
     </div>
@@ -60,57 +53,54 @@
             <li class="list-group-item">
               <a href="#" class="text-decoration-none d-block py-2" style="font-size: 1.2rem;">Wygeneruj dzienny raport</a>
             </li>
-          </ul>
+          </ul><br><br>
+              <div class="row mb-4">
+    <div class="col-12 text-center">
+      <form method="get" action="" id="switchTableForm">
+        <button type="submit" class="btn btn-primary" name="table" value="nginx_logs">nginx_logs</button>
+        <button type="submit" class="btn btn-primary" name="table" value="apache_access_logs">apache_access_logs</button>
+      </form>
+    </div>
+  </div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Drugi wiersz -->
-  <div class="row">
-    <div class="col-12 col-md-4 mb-4">
-      <div class="card w-100" style="min-height: 490px; display: flex; flex-direction: column; height: 360px;">
-        <div class="card-header bg-dark text-white">
-          Kody statusu (Sukces, Przekierowanie, Błąd klienta, Błąd serwera)
-        </div>
-          <div class="card-body d-flex flex-column" style="overflow: hidden;">
-          <ul class="list-group list-group-flush">
-            <li class="list-group-item border-bottom" style="font-size: 16px;">Kody statusu 200-299 (Sukces): <strong>{{ codes_count['Sukces (200-299)'] }}</strong> <span class="info-icon" title="Kody statusu 200-299: Oznaczają, że żądanie zostało pomyślnie przetworzone przez serwer. &#10;Przykładowe kody: &#10;1. 200 OK: Najczęściej spotykany kod, oznacza, że żądanie zostało pomyślnie przetworzone, a odpowiedź zawiera dane. &#10;2. 201 Created: Oznacza, że zasób został pomyślnie utworzony. Często używane w odpowiedzi na żądania POST, gdy tworzymy nowe zasoby (np. dodawanie użytkownika, zamówienia). &#10;3. 204 No Content: Oznacza, że żądanie zostało pomyślnie przetworzone, ale nie ma treści do zwrócenia. Stosowane w odpowiedzi na żądania, które nie wymagają zwrócenia danych (np. usuwanie zasobu).">❓</span></li>
-            <li class="list-group-item border-bottom" style="font-size: 16px;">Kody statusu 300-399 (Przekierowanie): <strong>{{ codes_count['Przekierowanie (300-399)'] }}</strong> <span class="info-icon" title="Kody statusu 300-399: Oznaczają, że użytkownik musi wykonać dodatkowe kroki, aby zakończyć żądanie. &#10;Przykładowe kody: &#10;1. 301 Moved Permanently: Oznacza, że zasób został trwale przeniesiony na nowy adres URL. Serwer informuje klienta, że powinien używać nowego URL w przyszłości. &#10;2. 302 Found: Oznacza, że zasób tymczasowo znajduje się w innym miejscu. Używane głównie do tymczasowych przekierowań. &#10;3. 304 Not Modified: Oznacza, że zasób nie został zmodyfikowany od ostatniego zapytania, więc można użyć wersji z cache.">❓</span></li>
-            <li class="list-group-item border-bottom" style="font-size: 16px;">Kody statusu 400-499 (Błąd klienta): <strong>{{ codes_count['Błąd klienta (400-499)'] }}</strong> <span class="info-icon" title="Kody statusu 400-499: Oznaczają, że problem wystąpił po stronie klienta (np. błąd w żądaniu). &#10;Przykładowe kody:&#10;1. 400 Bad Request: Oznacza, że żądanie było nieprawidłowe i serwer nie może go przetworzyć. Może to być spowodowane błędną składnią w zapytaniu. &#10;2. 401 Unauthorized: Oznacza, że klient nie jest uwierzytelniony i nie ma uprawnień do uzyskania dostępu do zasobu. Może wskazywać na problem z sesją lub brakiem loginu/hasła. &#10;3. 404 Not Found: Oznacza, że zasób nie został znaleziony na serwerze. Jest to jeden z najczęściej spotykanych kodów błędów, może być wynikiem błędnego URL lub usuniętego zasobu.">❓</span></li>
-            <li class="list-group-item" style="font-size: 16px;"> Kody statusu 500-599 (Błąd serwera): <strong>{{ codes_count['Błąd serwera (500-599)'] }}</strong> <span class="info-icon" title="Kody statusu 500-599: Oznaczają, że problem wystąpił po stronie serwera. &#10;Przykładowe kody:&#10;1. 500 Internal Server Error: Oznacza ogólny błąd serwera, który nie jest w stanie obsłużyć żądania. Może być wynikiem błędów aplikacji, niepoprawnej konfiguracji lub problemów z bazą danych. &#10;2. 502 Bad Gateway: Oznacza, że serwer pełniący rolę bramy lub proxy nie otrzymał prawidłowej odpowiedzi od serwera nadrzędnego. &#10;3. 503 Service Unavailable: Oznacza, że serwer jest chwilowo niedostępny, np. z powodu przeciążenia lub konserwacji.">❓</span></li>
-          </ul>
+<!-- Drugi wiersz -->
+<div class="row justify-content-center">
+  <div class="col-12 col-md-5 mb-4">
+    <div class="card w-100" style="min-height: 490px; display: flex; flex-direction: column; height: 360px;">
+      <div class="card-header bg-dark text-white">
+        Kody statusu (Sukces, Przekierowanie, Błąd klienta, Błąd serwera)
+      </div>
+      <div class="card-body d-flex flex-column" style="overflow: hidden;">
+        <ul class="list-group list-group-flush">
+          <li class="list-group-item border-bottom" style="font-size: 16px;">Kody statusu 200-299 (Sukces): <strong>{{ codes_count['Sukces (200-299)'] }}</strong> <span class="info-icon" title="Kody statusu 200-299: Oznaczają, że żądanie zostało pomyślnie przetworzone przez serwer. &#10;Przykładowe kody: &#10;1. 200 OK: Najczęściej spotykany kod, oznacza, że żądanie zostało pomyślnie przetworzone, a odpowiedź zawiera dane. &#10;2. 201 Created: Oznacza, że zasób został pomyślnie utworzony. Często używane w odpowiedzi na żądania POST, gdy tworzymy nowe zasoby (np. dodawanie użytkownika, zamówienia). &#10;3. 204 No Content: Oznacza, że żądanie zostało pomyślnie przetworzone, ale nie ma treści do zwrócenia. Stosowane w odpowiedzi na żądania, które nie wymagają zwrócenia danych (np. usuwanie zasobu).">❓</span></li>
+          <li class="list-group-item border-bottom" style="font-size: 16px;">Kody statusu 300-399 (Przekierowanie): <strong>{{ codes_count['Przekierowanie (300-399)'] }}</strong> <span class="info-icon" title="Kody statusu 300-399: Oznaczają, że użytkownik musi wykonać dodatkowe kroki, aby zakończyć żądanie. &#10;Przykładowe kody: &#10;1. 301 Moved Permanently: Oznacza, że zasób został trwale przeniesiony na nowy adres URL. Serwer informuje klienta, że powinien używać nowego URL w przyszłości. &#10;2. 302 Found: Oznacza, że zasób tymczasowo znajduje się w innym miejscu. Używane głównie do tymczasowych przekierowań. &#10;3. 304 Not Modified: Oznacza, że zasób nie został zmodyfikowany od ostatniego zapytania, więc można użyć wersji z cache.">❓</span></li>
+          <li class="list-group-item border-bottom" style="font-size: 16px;">Kody statusu 400-499 (Błąd klienta): <strong>{{ codes_count['Błąd klienta (400-499)'] }}</strong> <span class="info-icon" title="Kody statusu 400-499: Oznaczają, że problem wystąpił po stronie klienta (np. błąd w żądaniu). &#10;Przykładowe kody:&#10;1. 400 Bad Request: Oznacza, że żądanie było nieprawidłowe i serwer nie może go przetworzyć. Może to być spowodowane błędną składnią w zapytaniu. &#10;2. 401 Unauthorized: Oznacza, że klient nie jest uwierzytelniony i nie ma uprawnień do uzyskania dostępu do zasobu. Może wskazywać na problem z sesją lub brakiem loginu/hasła. &#10;3. 404 Not Found: Oznacza, że zasób nie został znaleziony na serwerze. Jest to jeden z najczęściej spotykanych kodów błędów, może być wynikiem błędnego URL lub usuniętego zasobu.">❓</span></li>
+          <li class="list-group-item" style="font-size: 16px;"> Kody statusu 500-599 (Błąd serwera): <strong>{{ codes_count['Błąd serwera (500-599)'] }}</strong> <span class="info-icon" title="Kody statusu 500-599: Oznaczają, że problem wystąpił po stronie serwera. &#10;Przykładowe kody:&#10;1. 500 Internal Server Error: Oznacza ogólny błąd serwera, który nie jest w stanie obsłużyć żądania. Może być wynikiem błędów aplikacji, niepoprawnej konfiguracji lub problemów z bazą danych. &#10;2. 502 Bad Gateway: Oznacza, że serwer pełniący rolę bramy lub proxy nie otrzymał prawidłowej odpowiedzi od serwera nadrzędnego. &#10;3. 503 Service Unavailable: Oznacza, że serwer jest chwilowo niedostępny, np. z powodu przeciążenia lub konserwacji.">❓</span></li>
+        </ul>
+      </div>
+      
+      <div class="card-body d-flex justify-content-center align-items-center" style="overflow: hidden;">
+        <img src="{{ url_for('http_status_pie_chart', table=table) }}" alt="Statusy HTTP">
 
-        </div>
-          
-          
-        <div class="card-body d-flex justify-content-center align-items-center" style="overflow: hidden;">
-          <img src="{{ url_for('http_status_pie_chart', table=request.args.get('table', 'nginx_logs')) }}" alt="Wykres kołowy statusów HTTP" class="img-fluid" style="max-width: 100%;">
-        </div>
       </div>
     </div>
+  </div>
 
-    <div class="col-12 col-md-4 mb-4">
-      <div class="card w-100" style="min-height: 490px;">
-        <div class="card-header bg-dark text-white">
-          Miejsce 5
-        </div>
-        <div class="card-body d-flex flex-column">
-          <p class="card-text">Opis miejsca 5.</p>
-        </div>
+  <div class="col-12 col-md-5 mb-4">
+    <div class="card w-100" style="min-height: 490px;">
+      <div class="card-header bg-dark text-white">
+        Systemy operacyjne
       </div>
-    </div>
-
-    <div class="col-12 col-md-4 mb-4">
-      <div class="card w-100" style="min-height: 490px;">
-        <div class="card-header bg-dark text-white">
-          Miejsce 6
-        </div>
-        <div class="card-body d-flex flex-column">
-          <p class="card-text">Opis miejsca 6.</p>
-        </div>
+      <div class="card-body d-flex flex-column">
+        <img src="{{ url_for('os_chart', table=table) }}" alt="Wykres systemów operacyjnych">
       </div>
     </div>
   </div>
 </div>
+</div>
+
 {% endblock %}

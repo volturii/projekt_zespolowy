@@ -1,5 +1,5 @@
 import sqlite3
-from flask import Flask, render_template, render_template_string, request, Response, url_for
+from flask import Flask, render_template, render_template_string, request, Response, url_for, send_from_directory
 import folium
 from folium.plugins import MarkerCluster
 import requests
@@ -11,6 +11,7 @@ import matplotlib
 matplotlib.use('Agg')  # Wymusza użycie backendu bez GUI
 import matplotlib.pyplot as plt
 import io
+import os
 from collections import Counter
 
 # Set up logging
@@ -22,9 +23,6 @@ app = Flask(__name__)
 # Functions for database connection
 def polaczZBaza():
     return sqlite3.connect('logs_database_test.db')
-
-
-
 
 
 
@@ -66,7 +64,109 @@ def get_http_methods(table):
         print(f"Błąd bazy danych: {e}")
         return []
 
-# Funkcja do pobierania danych z bazy (Próby nieautoryzowanego dostępu - statusy HTTP)
+# Funkcja do zapisania wykresu w pliku
+def save_chart_to_file(fig, chart_name):
+    static_dir = os.path.join(os.getcwd(), 'static')  # Ścieżka do folderu static
+    wykresy_dir = os.path.join(static_dir, 'wykresy')  # Ścieżka do folderu wykresy w folderze static
+    
+    if not os.path.exists(wykresy_dir):
+        os.makedirs(wykresy_dir)  # Tworzy folder wykresy, jeśli nie istnieje
+    
+    file_path = os.path.join(wykresy_dir, chart_name)  # Pełna ścieżka do pliku
+
+    # Jeśli plik już istnieje, usuń go przed zapisaniem nowego wykresu
+    if os.path.exists(file_path):
+        os.remove(file_path)
+
+    fig.savefig(file_path, format='png', bbox_inches='tight')
+    plt.close(fig)
+
+# Endpoint do generowania wykresu słupkowego (Ranking IP)
+@app.route('/top_ips_chart/<table>')
+def top_ips_chart(table):
+    data = get_top_ips(table)
+    fig, ax = plt.subplots(figsize=(6, 4.3))
+
+    if data:
+        ips = [item[0] for item in data]
+        request_counts = [item[1] for item in data]
+
+        colors = plt.cm.Reds([0.8 - 0.2 * i for i in range(len(ips))])
+
+        bars = ax.bar(ips, request_counts, color=colors, edgecolor='black', width=0.4)
+        ax.set_xlabel('Adres IP', fontsize=11, fontweight='bold')
+        ax.set_ylabel('Liczba zapytań', fontsize=11, fontweight='bold')
+        ax.grid(axis='y', linestyle='--', alpha=0.7)
+
+        for bar in bars:
+            height = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width() / 2, height, f'{height}', ha='center', va='bottom', fontsize=10)
+    else:
+        ax.text(0.5, 0.5, 'Brak danych', ha='center', va='center', fontsize=12)
+        ax.axis('off')
+
+    # Zapisz wykres do pliku
+    save_chart_to_file(fig, f'top_ips_{table}.png')
+
+    # Zwróć wykres jako obraz
+    return send_from_directory(os.path.join('static', 'wykresy'), f'top_ips_{table}.png')
+
+@app.route('/http_methods_chart/<table>')
+def http_methods_chart(table):
+    data = get_http_methods(table)
+    fig, ax = plt.subplots(figsize=(7, 5.5))
+
+    if data:
+        methods = [item[0] for item in data]
+        counts = [item[1] for item in data]
+
+        colors = plt.cm.Paired(range(len(methods)))
+
+        wedges, texts, autotexts = ax.pie(
+            counts,
+            colors=colors,
+            autopct='%1.1f%%',
+            startangle=140,
+            textprops={'fontsize': 10},
+            wedgeprops={'linewidth': 1, 'edgecolor': 'black', 'width': 0.66}
+        )
+
+        total = sum(counts)
+
+        ax.text(0, 0.1, 'Total', ha='center', va='center', fontsize=10, fontweight='normal')
+        ax.text(0, -0.1, f'{total}', ha='center', va='center', fontsize=12, fontweight='bold')
+
+        legend = fig.legend(
+            wedges,
+            methods,
+            title="Metody HTTP",
+            loc="lower center",
+            bbox_to_anchor=(0.5, 0.1),
+            ncol=len(methods),
+            frameon=False,
+            fontsize=9
+        )
+
+        line = plt.Line2D([0.1, 0.9], [0.22, 0.22], color='black', lw=0.8, transform=fig.transFigure, clip_on=False)
+        fig.add_artist(line)
+
+        fig.subplots_adjust(bottom=0.25)
+    else:
+        ax.text(0.5, 0.5, 'Brak danych', ha='center', va='center', fontsize=12)
+        ax.axis('off')
+
+    # Zapisz wykres do pliku
+    save_chart_to_file(fig, f'http_methods_{table}.png')
+
+    # Zwróć wykres jako obraz
+    return send_from_directory(os.path.join('static', 'wykresy'), f'http_methods_{table}.png')
+
+
+
+
+
+
+# Funkcja do pobierania danych z bazy (Statusy HTTP)
 def get_http_status_codes(table):
     query = f"""
         SELECT status, COUNT(*) as count
@@ -107,17 +207,9 @@ def get_http_status_codes(table):
     except sqlite3.Error as e:
         print(f"Błąd bazy danych: {e}")
         return {}
-    
-
-
-
-
-
-
 
 # Funkcja do wydobywania systemu operacyjnego z user_agent
 def get_operating_system(user_agent):
-    # Wzorce do wykrywania systemów operacyjnych
     os_patterns = {
         'Windows': r'Windows NT \d+\.\d+',
         'Mac OS': r'Macintosh;.*Mac OS X',
@@ -127,7 +219,6 @@ def get_operating_system(user_agent):
         'Linux': r'Linux',
     }
 
-    # Dodanie obsługi dla narzędzi jak curl i wget
     if 'curl' in user_agent or 'Wget' in user_agent:
         return 'Bot'
 
@@ -135,7 +226,6 @@ def get_operating_system(user_agent):
         if re.search(pattern, user_agent):
             return os_name
     return 'Inny'
-
 
 # Funkcja do pobierania systemów operacyjnych z bazy
 def get_os_data(table):
@@ -151,9 +241,8 @@ def get_os_data(table):
         results = cursor.fetchall()
         conn.close()
 
-        # Analizowanie user_agent i zliczanie systemów operacyjnych
         os_list = [get_operating_system(row[0]) for row in results]
-        os_count = dict(Counter(os_list))  # Zliczanie wystąpień systemów operacyjnych
+        os_count = dict(Counter(os_list))
         return os_count
     except sqlite3.Error as e:
         print(f"Błąd bazy danych: {e}")
@@ -169,7 +258,6 @@ def os_chart(table):
         os_names = list(data.keys())
         counts = list(data.values())
 
-        # Tworzenie wykresu słupkowego poziomego
         bars = ax.barh(os_names, counts, color='skyblue', edgecolor='black', height=0.45)
         ax.set_xlabel('Liczba zapytań', fontsize=11, fontweight='bold')
         ax.set_ylabel('System Operacyjny', fontsize=11, fontweight='bold')
@@ -177,102 +265,14 @@ def os_chart(table):
 
         for bar in bars:
             width = bar.get_width()
-            ax.text(width + 0.5, bar.get_y() + bar.get_height() / 2, f'{width}', ha='left', va='center', fontsize=10)
+            ax.text(width + 0.1, bar.get_y() + bar.get_height() / 2, f'{width}', ha='left', va='center', fontsize=10)
     else:
         ax.text(0.5, 0.5, 'Brak danych', ha='center', va='center', fontsize=12)
         ax.axis('off')
 
-    img = io.BytesIO()
-    plt.savefig(img, format='png', bbox_inches='tight')
-    img.seek(0)
-    plt.close(fig)
-    return Response(img, mimetype='image/png')
+    save_chart_to_file(fig, f'os_chart_{table}.png')
 
-
-
-
-
-    
-
-# Endpoint do generowania wykresu słupkowego (Ranking IP)
-@app.route('/top_ips_chart/<table>')
-def top_ips_chart(table):
-    data = get_top_ips(table)
-    fig, ax = plt.subplots(figsize=(6, 4.3))
-
-    if data:
-        ips = [item[0] for item in data]
-        request_counts = [item[1] for item in data]
-
-        colors = plt.cm.Reds([0.8 - 0.2 * i for i in range(len(ips))])
-
-        bars = ax.bar(ips, request_counts, color=colors, edgecolor='black', width=0.35)
-        ax.set_xlabel('Adres IP', fontsize=11, fontweight='bold')
-        ax.set_ylabel('Liczba zapytań', fontsize=11, fontweight='bold')
-        ax.grid(axis='y', linestyle='--', alpha=0.7)
-
-        for bar in bars:
-            height = bar.get_height()
-            ax.text(bar.get_x() + bar.get_width() / 2, height, f'{height}', ha='center', va='bottom', fontsize=10)
-    else:
-        ax.text(0.5, 0.5, 'Brak danych', ha='center', va='center', fontsize=12)
-        ax.axis('off')
-
-    img = io.BytesIO()
-    plt.savefig(img, format='png', bbox_inches='tight')
-    img.seek(0)
-    plt.close(fig)
-    return Response(img, mimetype='image/png')
-
-@app.route('/http_methods_chart/<table>')
-def http_methods_chart(table):
-    data = get_http_methods(table)
-    fig, ax = plt.subplots(figsize=(8, 6))
-
-    if data:
-        methods = [item[0] for item in data]
-        counts = [item[1] for item in data]
-
-        colors = plt.cm.Paired(range(len(methods)))
-
-        wedges, texts, autotexts = ax.pie(
-            counts,
-            colors=colors,
-            autopct='%1.1f%%',
-            startangle=140,
-            textprops={'fontsize': 10},
-            wedgeprops={'linewidth': 1, 'edgecolor': 'black', 'width': 0.66}
-        )
-
-        total = sum(counts)
-
-        ax.text(0, 0.1, 'Total', ha='center', va='center', fontsize=10, fontweight='normal')
-        ax.text(0, -0.1, f'{total}', ha='center', va='center', fontsize=12, fontweight='bold')
-
-        legend = fig.legend(
-            wedges,
-            methods,
-            title="Metody HTTP",
-            loc="lower center",
-            bbox_to_anchor=(0.5, 0.1),
-            ncol=len(methods),
-            frameon=False,
-            fontsize=10
-        )
-
-        line = plt.Line2D([0.1, 0.9], [0.22, 0.22], color='black', lw=0.8, transform=fig.transFigure, clip_on=False)
-        fig.add_artist(line)
-
-        fig.subplots_adjust(bottom=0.25)
-    else:
-        ax.text(0.5, 0.5, 'Brak danych', ha='center', va='center', fontsize=12)
-        ax.axis('off')
-
-    img = io.BytesIO()
-    plt.savefig(img, format='png', bbox_inches='tight')
-    img.seek(0)
-    plt.close(fig)
-    return Response(img, mimetype='image/png')
+    return send_from_directory(os.path.join('static', 'wykresy'), f'os_chart_{table}.png')
 
 @app.route('/http_status_pie_chart/<table>')
 def http_status_pie_chart(table):
@@ -282,9 +282,12 @@ def http_status_pie_chart(table):
     if data:
         labels = list(data.keys())
         sizes = list(data.values())
-
-        colors = plt.cm.Paired(range(len(labels)))
-
+        colors = [
+            (0, 1, 0),
+            (1, 1, 0),
+            (1, 0.577, 0),
+            (1, 0, 0)
+        ]
         wedges, texts, autotexts = ax.pie(
             sizes,
             labels=None,
@@ -308,14 +311,9 @@ def http_status_pie_chart(table):
         ax.text(0.5, 0.5, 'Brak danych', ha='center', va='center', fontsize=12)
         ax.axis('off')
 
-    img = io.BytesIO()
-    plt.savefig(img, format='png', bbox_inches='tight')
-    img.seek(0)
-    plt.close(fig)
-    return Response(img, mimetype='image/png')
+    save_chart_to_file(fig, f'http_status_pie_chart_{table}.png')
 
-
-
+    return send_from_directory(os.path.join('static', 'wykresy'), f'http_status_pie_chart_{table}.png')
 
 
 
